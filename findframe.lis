@@ -1,0 +1,592 @@
+     1                                  ;  Linux: nasm -f elf64 -l findframe.lis -o findframe.o findframe.asm
+     2                                  
+     3                                  %include "debug.inc"
+     4                              <1> ;========1=========2=========3=========4=========5=========6=========7=========8=========9=========0=========1=========2=========3=========4=========5=========6=========7**
+     5                              <1> ;System Title:  Debugger for X86 assembly programs
+     6                              <1> ;Author: Floyd Holliday
+     7                              <1> ;Email: activeprofessor@yahoo.com
+     8                              <1> ;Status: Released for general use; bugs will be fixed when reported
+     9                              <1> ;This module file name: debug.inc
+    10                              <1> ;This module purpose: This file is an "include" file.  It allows data to pass directly from the calling statement to the subprogram.
+    11                              <1> ;Language: X86
+    12                              <1> ;Syntax: Intel
+    13                              <1> ;Date of last update: 2013-Dec-13
+    14                              <1> ;Source file structure: width is 140 characters; detailed comments begin in column 61.
+    15                              <1> ;Printing: best results are obtained using landscape orientation with 9 point (or less) monospaced font.
+    16                              <1> ;
+    17                              <1> ;Targeted user group: Assembly programmers enrolled in programming courses like CPSC240.
+    18                              <1> ;
+    19                              <1> ;Requirements: debug.asm must be assembled into debug.o  This file is not to be assembled; it is used as is.  Place this file in the 
+    20                              <1> ;directory along with debug.o and with other assembled object files.
+    21                              <1> ;
+    22                              <1> 
+    23                              <1> ;===== showregisters ======================================================================================================================
+    24                              <1> 
+    25                              <1> extern showregisterssubprogram
+    26                              <1> 
+    27                              <1> %macro showregisters 1
+    28                              <1>     push qword %1
+    29                              <1>     call showregisterssubprogram
+    30                              <1>     ;Question: Where is the pop corresponding to the push above?  Answer: In the ret statement.
+    31                              <1> %endmacro
+    32                              <1> 
+    33                              <1> ;===== showstack ==========================================================================================================================
+    34                              <1> 
+    35                              <1> extern showstacksubprogram
+    36                              <1> 
+    37                              <1> %macro dumpstack 3
+    38                              <1>     push rsp                                      ;Save the current value of rsp since rsp is very volatile
+    39                              <1>     push rbp                                      ;Save the current value of rbp for insurance
+    40                              <1>     push qword %3                                 ;number of qwords inside the stack
+    41                              <1>     push qword %2                                 ;number of qwords outside the stack
+    42                              <1>     push qword %1                                 ;an arbitrary integer created by the caller
+    43                              <1>     call showstacksubprogram
+    44                              <1>     ;Question: Where are the pops corresponding to three pushes above?  Answer: In the ret statement.
+    45                              <1> %endmacro
+    46                              <1> 
+    47                              <1> ;===== showfpu ============================================================================================================================
+    48                              <1> 
+    49                              <1> extern showfpusubprogram
+    50                              <1> 
+    51                              <1> %macro showfpuregisters 1
+    52                              <1>     push qword %1                                 ;Integer identifying this showing of the fpu registers.
+    53                              <1>     call showfpusubprogram
+    54                              <1>     ;Where are the pops corresponding to those pushes?
+    55                              <1> %endmacro
+    56                              <1> 
+    57                              <1> ;===== showxmm ============================================================================================================================
+    58                              <1> 
+    59                              <1> extern showxmmsubprogram
+    60                              <1> 
+    61                              <1> %macro showxmmregisters 1
+    62                              <1>      push qword %1
+    63                              <1>      call showxmmsubprogram
+    64                              <1> %endmacro
+    65                              <1> 
+    66                              <1> ;===== showymm ============================================================================================================================
+    67                              <1> 
+    68                              <1> extern showymmsubprogram
+    69                              <1> 
+    70                              <1> %macro showymmregisters 1
+    71                              <1>     push qword %1
+    72                              <1>     call showymmsubprogram
+    73                              <1> %endmacro
+    74                              <1> 
+    75                              <1> ;==========================================================================================================================================
+    76                              <1> 
+    77                              <1> ;How to use the debugger.
+    78                              <1> 
+    79                              <1> ;1.  Assemble the file debug.asm and thereby create an object file known as debug.o
+    80                              <1> 
+    81                              <1> ;2.  Place into one single directory this file, debug.inc, and debug.o, and as many addition source file as desired.
+    82                              <1> 
+    83                              <1> ;3.  Insert the statement < %include "debug.inc" > without angle brackets into an asm source file to be debugged.  Place the statement 
+    84                              <1> ;    before segment .data .
+    85                              <1> 
+    86                              <1> ;4.  In segment .text place debugging statements at places where you want to examen the contents of registers.  There are four kinds 
+    87                              <1> ;    of debug statements, namely: show the integer registers, show the system stack, show the fpu registers, and show the SSE2 
+    88                              <1> ;    registers.  Examples of each of the four kinds of debug statements are found below.
+    89                              <1> 
+    90                              <1> ;Example of debug statememts.
+    91                              <1> 
+    92                              <1> ;==============================================
+    93                              <1> ;  showregisters 33
+    94                              <1> ;==============================================
+    95                              <1> ;The statement above will show the contents of all 16 integer registers and the contents of the flags register.  The trailing number 33 
+    96                              <1> ;is arbitrary.  The number 33 in the example can be replaced with any integer, but it cannot be omitted.
+    97                              <1> 
+    98                              <1> ;==============================================
+    99                              <1> ;  dumpstack 88, 2, 5
+   100                              <1> ;==============================================
+   101                              <1> ;The statement above will show the contents the system stack beginning with 2 quadwords outside of the top of the stack and ending with
+   102                              <1> ;quadword #5 inside the stack for a total of 8 quadwords.  The first parameter 88 is an arbitrary integer selected by the programmer.
+   103                              <1> ;The second parameter 2 indicates the number of quadwords beyond the top to be displayed.  To display nothing outside of the stack set
+   104                              <1> ;the middle parameter to 0.  The last parameter 5 is the number of qwords after the top to be display.  The count is from 0 to 5, and
+   105                              <1> ;therefore, a 5 parameter will cause 6 qwords inside the stack to be outputted.
+   106                              <1> 
+   107                              <1> ;==============================================
+   108                              <1> ;  showfpuregisters 133
+   109                              <1> ;==============================================
+   110                              <1> ;The statement above will show the contents of all 8 fpu registers.  The parameter 133 is arbitrary and may be replaced by any integer,
+   111                              <1> ;but it cannot be omitted.
+   112                              <1> 
+   113                              <1> ;==============================================
+   114                              <1> ;  showxmmregisters 888
+   115                              <1> ;==============================================
+   116                              <1> ;The statement above will show the contents of all 16 SSE2 registers.  The parameter 888 is arbitrary and may be replaced by any integer,
+   117                              <1> ;but it cannot be omitted.
+   118                              <1> 
+   119                              <1> ;==============================================
+   120                              <1> ;  showymmregisters 225
+   121                              <1> ;==============================================
+   122                              <1> ;The statement above will show the contents of all 16 AVE registers.  The parameter 225 is arbitrary and may be replaced by any integer,
+   123                              <1> ;but it cannot be omitted.
+   124                              <1> 
+   125                              <1> 
+   126                              <1> 
+   127                              <1> 
+   128                              <1> ;To the 240 class:
+   129                              <1> ;This debug set of subprograms was derived from the original work of Dr Paul Carter.  He made a similar set of subprograms that could 
+   130                              <1> ;be easily included in any assembly program.  All of his work was written in X86-32m and unfortunately, he seems to have lost interest 
+   131                              <1> ;in updating his work.  You can and probably should visit his website: http://www.drpaulcarter.com/pcasm/.  There you may download the
+   132                              <1> ;original include files which he called "asm_io.inc" and "asm_io.asm".  They are inside a zip file.  He also has a free ebook there on 
+   133                              <1> ;X86-32 programming.  Yes, all the examples are 32-bit one, but the text description of instructions is still very helpful.  For 
+   134                              <1> ;instance, in his ebook you can read a concise description of many of the FPU87 instructions, that is, those instructions that act on
+   135                              <1> ;the st registers.  Yes, I am aware that others have tried to update his work to become relevant to 64-bit programming, but I still like
+   136                              <1> ;the original ebook.
+   137                              <1> 
+   138                              <1> ;Thus, Dr Carter's work was the foundation for the debug.inc and debug.asm files you are now reading.  For the curious, you may wonder 
+   139                              <1> ;what happens when an assembly program has to call a C++ function that requires more that 6 incoming parameters.  There is an example of
+   140                              <1> ;passing 9 parameters to printf in the "showregisterssubprogram", which is inside the file debug.asm.  Notice the registerformat1 requires 8 numeric
+   141                              <1> ;values be passed to printf in addition to passing the string registerformat1 in rdi.  
+   142                              <1> 
+   143                              <1> 
+   144                                  %include "backupmacro.inc"
+   145                              <1> extern backupregisters
+   146                              <1> 
+   147                              <1> %macro backupGPR 0
+   148                              <1> 
+   149                              <1> push       rbp                                              ;Save a copy of the stack base pointer
+   150                              <1> mov        rbp, rsp                                         ;We do this in order to be 100% compatible with C and C++.
+   151                              <1> push       rbx                                              ;Back up rbx
+   152                              <1> push       rcx                                              ;Back up rcx
+   153                              <1> push       rdx                                              ;Back up rdx
+   154                              <1> push       rsi                                              ;Back up rsi
+   155                              <1> push       rdi                                              ;Back up rdi
+   156                              <1> push       r8                                               ;Back up r8
+   157                              <1> push       r9                                               ;Back up r9
+   158                              <1> push       r10                                              ;Back up r10
+   159                              <1> push       r11                                              ;Back up r11
+   160                              <1> push       r12                                              ;Back up r12
+   161                              <1> push       r13                                              ;Back up r13
+   162                              <1> push       r14                                              ;Back up r14
+   163                              <1> push       r15                                              ;Back up r15
+   164                              <1> pushf                                                       ;Back up rflags
+   165                              <1> 
+   166                              <1> %endmacro
+   167                              <1> 
+   168                              <1> extern backupcomponents
+   169                              <1> 
+   170                              <1> 
+   171                              <1> %macro backupComponents 1
+   172                              <1> 
+   173                              <1> ;=====================================================================================================================================
+   174                              <1> ;===== Begin State Component Backup =======================================================================================================================================
+   175                              <1> ;=====================================================================================================================================
+   176                              <1> 
+   177                              <1> ;=========== Before proceeding verify that this computer supports xsave and xrstor ==================================================
+   178                              <1> ;Bit #26 of rcx, written rcx[26], must be 1; otherwise xsave and xrstor are not supported by this computer.
+   179                              <1> ;Preconditions: rax holds 1.
+   180                              <1> mov        rax, %1
+   181                              <1> 
+   182                              <1> ;Execute the cpuid instruction
+   183                              <1> cpuid
+   184                              <1> 
+   185                              <1> ;Postconditions: If rcx[26]==1 then xsave is supported.  If rcx[26]==0 then xsave is not supported.
+   186                              <1> 
+   187                              <1> ;=========== Extract bit #26 and test it ===============================================================================================
+   188                              <1> 
+   189                              <1> and        rcx, 0x0000000004000000                          ;The mask 0x0000000004000000 has a 1 in position #26.  Now rcx is either all zeros or
+   190                              <1>                                                             ;has a single 1 in position #26 and zeros everywhere else.
+   191                              <1> cmp        rcx, 0                                           ;Is (rcx == 0)?
+   192                              <1> je         xsavenotsupported                                ;Skip the section that backs up state component data.
+   193                              <1> 
+   194                              <1> ;========== Call the function to obtain the bitmap of state components =================================================================
+   195                              <1> 
+   196                              <1> ;Preconditions
+   197                              <1> mov        rax, 0x000000000000000d                          ;Place 13 in rax.  This number is provided in the Intel manual
+   198                              <1> mov        rcx, 0                                           ;0 is parameter for subfunction 0
+   199                              <1> 
+   200                              <1> ;Call the function
+   201                              <1> cpuid                                                       ;cpuid is an essential function that returns information about the cpu
+   202                              <1> 
+   203                              <1> ;Postconditions (There are 2 of these):
+   204                              <1> 
+   205                              <1> ;1.  edx:eax is a bit map of state components managed by xsave.  At the time this program was written (2014 June) there were exactly 3 state components.  Therefore, bits
+   206                              <1> ;    numbered 2, 1, and 0 are important for current cpu technology.
+   207                              <1> ;2.  ecx holds the number of bytes required to store all the data of enabled state components. [Post condition 2 is not used in this program.]
+   208                              <1> ;This program assumes that under current technology (year 2014) there are at most three state components having a maximum combined data storage requirement of 832 bytes.
+   209                              <1> ;Therefore, the value in ecx will be less than or equal to 832.
+   210                              <1> 
+   211                              <1> ;Precaution: As an insurance against a future time when there will be more than 3 state components in a processor of the X86 family the state component bitmap is masked to
+   212                              <1> ;allow only 3 state components maximum.
+   213                              <1> 
+   214                              <1> mov        r15, 7                                           ;7 equals three 1 bits.
+   215                              <1> and        rax, r15                                         ;Bits 63-3 become zeros.
+   216                              <1> mov        r15, 0                                           ;0 equals 64 binary zeros.
+   217                              <1> and        rdx, r15                                         ;Zero out rdx.
+   218                              <1> 
+   219                              <1> ;========== Save all the data of all three components except GPRs ====================================================================
+   220                              <1> 
+   221                              <1> ;The instruction xsave will save those state components with on bits in the bitmap.  At this point edx:eax continues to hold the state component bitmap.
+   222                              <1> 
+   223                              <1> ;Precondition: edx:eax holds the state component bit map.  This condition has been met by the two pops preceding this statement.
+   224                              <1> xsave      [backuparea]                                     ;All the data of state components managed by xsave have been written to backuparea.
+   225                              <1> 
+   226                              <1> push qword -1                                               ;Set a flag (-1 = true) to indicate that state component data were backed up.
+   227                              <1> jmp        startapplication
+   228                              <1> 
+   229                              <1> ;========== Show message xsave is not supported on this platform ======================================================================
+   230                              <1> xsavenotsupported:
+   231                              <1> 
+   232                              <1> mov        rax, 0
+   233                              <1> mov        rdi, .stringformat
+   234                              <1> mov        rsi, .notsupportedmessage                        ;"The xsave instruction is not suported in this microprocessor.
+   235                              <1> call       printf
+   236                              <1> 
+   237                              <1> push qword 0                                                ;Set a flag (0 = false) to indicate that state component data were not backed up.
+   238                              <1> 
+   239                              <1> ;=====================================================================================================================================
+   240                              <1> ;===== End of State Component Backup =================================================================================================
+   241                              <1> 
+   242                              <1> 
+   243                              <1> 
+   244                              <1> %endmacro
+   245                              <1> 
+   246                              <1> 
+   247                              <1> extern restoreRegisters
+   248                              <1> 
+   249                              <1> %macro restoreGPR 0
+   250                              <1> 
+   251                              <1> ;=========== Restore GPR values and return to the caller =======================================================================
+   252                              <1> 
+   253                              <1> popf                                                        ;Restore rflags
+   254                              <1> pop        r15                                              ;Restore r15
+   255                              <1> pop        r14                                              ;Restore r14
+   256                              <1> pop        r13                                              ;Restore r13
+   257                              <1> pop        r12                                              ;Restore r12
+   258                              <1> pop        r11                                              ;Restore r11
+   259                              <1> pop        r10                                              ;Restore r10
+   260                              <1> pop        r9                                               ;Restore r9
+   261                              <1> pop        r8                                               ;Restore r8
+   262                              <1> pop        rdi                                              ;Restore rdi
+   263                              <1> pop        rsi                                              ;Restore rsi
+   264                              <1> pop        rdx                                              ;Restore rdx
+   265                              <1> pop        rcx                                              ;Restore rcx
+   266                              <1> pop        rbx                                              ;Restore rbx
+   267                              <1> pop        rbp                                              ;Restore rbp
+   268                              <1> 
+   269                              <1> ret                                                         ;No parameter with this instruction.  This instruction will pop 8 bytes from
+   270                              <1>        
+   271                              <1> %endmacro
+   272                              <1> 
+   273                              <1> extern restoreComponents
+   274                              <1> 
+   275                              <1> %macro restorecomponents 0
+   276                              <1> 
+   277                              <1> ;===============================================================================================================================
+   278                              <1> ;===== Begin State Component Restore ===========================================================================================
+   279                              <1> ;===============================================================================================================================
+   280                              <1> 
+   281                              <1> ;===== Check the flag to determine if state components were really backed up ===================================================
+   282                              <1> 
+   283                              <1> pop        rbx                                              ;Obtain a copy of the flag that indicates state component backup or not.
+   284                              <1> cmp        rbx, 0                                           ;If there was no backup of state components then jump past the restore section.
+   285                              <1> je         setreturnvalue                                   ;Go to set up the return value.
+   286                              <1> 
+   287                              <1> ;Continue with restoration of state components;
+   288                              <1> 
+   289                              <1> ;Precondition: edx:eax must hold the state component bitmap.  Therefore, go get a new copy of that bitmap.
+   290                              <1> 
+   291                              <1> ;Preconditions for obtaining the bitmap from the cpuid instruction
+   292                              <1> mov        rax, 0x000000000000000d                          ;Place 13 in rax.  This number is provided in the Intel manual
+   293                              <1> mov        rcx, 0                                           ;0 is parameter for subfunction 0
+   294                              <1> 
+   295                              <1> ;Call the function
+   296                              <1> cpuid                                                       ;cpuid is an essential function that returns information about the cpu
+   297                              <1> 
+   298                              <1> ;Postcondition: The bitmap in now in edx:eax
+   299                              <1> 
+   300                              <1> ;Future insurance: Make sure the bitmap is limited to a maximum of 3 state components.
+   301                              <1> mov        r15, 7
+   302                              <1> and        rax, r15
+   303                              <1> mov        r15, 0
+   304                              <1> and        rdx, r15
+   305                              <1> 
+   306                              <1> xrstor     [backuparea]
+   307                              <1> 
+   308                              <1> ;===============================================================================================================================
+   309                              <1> ;===== End State Component Restore =============================================================================================
+   310                              <1> ;===============================================================================================================================
+   311                              <1> 
+   312                              <1> 
+   313                              <1> setreturnvalue: ;=========== Set the value to be returned to the caller ========================================================
+   314                              <1> 
+   315                              <1> push       r14                                              ;r14 continues to hold the first computed floating point value.
+   316                              <1> movsd      xmm0, [rsp]                                      ;That first computed floating point value is copied to xmm0[63-0]
+   317                              <1> pop        r14                                              ;Reverse the push of two lines earlier.
+   318                              <1> 
+   319                              <1> %endmacro
+   320                                  
+   321                                  extern printf                                               
+   322                                  extern scanf                                                ;External C++ function for reading from the standard input device
+   323                                  
+   324                                  global findframe                                            ;This makes findframe callable by functions outside of this file.
+   325                                  global backupregisters
+   326                                  global backupcomponents
+   327                                  global restoreComponents
+   328                                  global restoreRegisters
+   329                                  
+   330                                  
+   331                                  segment .data                                               ;Place initialized data here
+   332                                  
+   333                                  ;===== Declare some messages ============================================================================================================
+   334 00000000 5242503A2020305825-     hex_msg  db     "RBP:  0X%016lx", 10, 0
+   335 00000009 3031366C780A00     
+   336                                  
+   337 00000010 546865207873617665-     xsavenotsupported.notsupportedmessage db "The xsave instruction and the xrstor instruction are not supported in this microprocessor.", 10
+   338 00000019 20696E737472756374-
+   339 00000022 696F6E20616E642074-
+   340 0000002B 686520787273746F72-
+   341 00000034 20696E737472756374-
+   342 0000003D 696F6E20617265206E-
+   343 00000046 6F7420737570706F72-
+   344 0000004F 74656420696E207468-
+   345 00000058 6973206D6963726F70-
+   346 00000061 726F636573736F722E-
+   347 0000006A 0A                 
+   348 0000006B 486F77657665722C20-                                           db "However, processing will continue without backing up state component data", 10, 0
+   349 00000074 70726F63657373696E-
+   350 0000007D 672077696C6C20636F-
+   351 00000086 6E74696E7565207769-
+   352 0000008F 74686F757420626163-
+   353 00000098 6B696E672075702073-
+   354 000000A1 7461746520636F6D70-
+   355 000000AA 6F6E656E7420646174-
+   356 000000B3 610A00             
+   357                                  
+   358 000000B6 257300                  stringformat db "%s", 0                                     ;general string format
+   359                                  
+   360 000000B9 257300                  xsavenotsupported.stringformat db "%s", 0
+   361                                  
+   362 000000BC 256C6600                eight_byte_format db "%lf", 0                               ;general 8-byte float format
+   363 000000C0 256C6400                int_format        db "%ld", 0
+   364                                  
+   365                                  segment .bss                                                ;Place un-initialized data here.
+   366                                  
+   367                                  align 64                                                    ;Insure that the inext data declaration starts on a 64-byte boundar.
+   368 00000000 <res 00000340>          backuparea resb 832                                         ;Create an array for backup storage having 832 bytes.
+   369 00000340 <res 00000340>          localbackup resb 832                                         ;Create an array for backup storage having 832 bytes.
+   370                                  ;===== Begin executable instructions here =====================================================================
+   371                                  
+   372                                  segment .text                                               ;Place executable instructions in this segment.
+   373                                  
+   374                                  findframe:                                                  ;Entry point.  Execution begins here.
+   375                                  
+   376                                  ;=========== Back up GPRs and Component Macros ===========================================================
+   377                                  
+   378                                  backupGPR
+   379                              <1> 
+   380 00000000 55                  <1> push rbp
+   381 00000001 4889E5              <1> mov rbp, rsp
+   382 00000004 53                  <1> push rbx
+   383 00000005 51                  <1> push rcx
+   384 00000006 52                  <1> push rdx
+   385 00000007 56                  <1> push rsi
+   386 00000008 57                  <1> push rdi
+   387 00000009 4150                <1> push r8
+   388 0000000B 4151                <1> push r9
+   389 0000000D 4152                <1> push r10
+   390 0000000F 4153                <1> push r11
+   391 00000011 4154                <1> push r12
+   392 00000013 4155                <1> push r13
+   393 00000015 4156                <1> push r14
+   394 00000017 4157                <1> push r15
+   395 00000019 9C                  <1> pushf
+   396                              <1> 
+   397                                  
+   398                                  backupComponents 1
+   399                              <1> 
+   400                              <1> 
+   401                              <1> 
+   402                              <1> 
+   403                              <1> 
+   404                              <1> 
+   405                              <1> 
+   406                              <1> 
+   407 0000001A B801000000          <1> mov rax, %1
+   408                              <1> 
+   409                              <1> 
+   410 0000001F 0FA2                <1> cpuid
+   411                              <1> 
+   412                              <1> 
+   413                              <1> 
+   414                              <1> 
+   415                              <1> 
+   416 00000021 4881E100000004      <1> and rcx, 0x0000000004000000
+   417                              <1> 
+   418 00000028 4883F900            <1> cmp rcx, 0
+   419 0000002C 742A                <1> je xsavenotsupported
+   420                              <1> 
+   421                              <1> 
+   422                              <1> 
+   423                              <1> 
+   424 0000002E B80D000000          <1> mov rax, 0x000000000000000d
+   425 00000033 B900000000          <1> mov rcx, 0
+   426                              <1> 
+   427                              <1> 
+   428 00000038 0FA2                <1> cpuid
+   429                              <1> 
+   430                              <1> 
+   431                              <1> 
+   432                              <1> 
+   433                              <1> 
+   434                              <1> 
+   435                              <1> 
+   436                              <1> 
+   437                              <1> 
+   438                              <1> 
+   439                              <1> 
+   440                              <1> 
+   441 0000003A 41BF07000000        <1> mov r15, 7
+   442 00000040 4C21F8              <1> and rax, r15
+   443 00000043 41BF00000000        <1> mov r15, 0
+   444 00000049 4C21FA              <1> and rdx, r15
+   445                              <1> 
+   446                              <1> 
+   447                              <1> 
+   448                              <1> 
+   449                              <1> 
+   450                              <1> 
+   451 0000004C 0FAE2425[00000000]  <1> xsave [backuparea]
+   452                              <1> 
+   453 00000054 6AFF                <1> push qword -1
+   454 00000056 EB20                <1> jmp startapplication
+   455                              <1> 
+   456                              <1> 
+   457                              <1> xsavenotsupported:
+   458                              <1> 
+   459 00000058 B800000000          <1> mov rax, 0
+   460 0000005D 48BF-               <1> mov rdi, .stringformat
+   461 0000005F [B900000000000000]  <1>
+   462 00000067 48BE-               <1> mov rsi, .notsupportedmessage
+   463 00000069 [1000000000000000]  <1>
+   464 00000071 E8(00000000)        <1> call printf
+   465                              <1> 
+   466 00000076 6A00                <1> push qword 0
+   467                              <1> 
+   468                              <1> 
+   469                              <1> 
+   470                              <1> 
+   471                              <1> 
+   472                              <1> 
+   473                                  
+   474                                  ;===================================================================================================================
+   475                                  startapplication: 
+   476                                  
+   477                                  ;Inspect the stack visually.  
+   478 00000078 4989E9                  mov       r9, rbp                                           ;rbp is copied safely into r9
+   479 0000007B 4889E5                  mov       rbp, rsp                                          ;The starting address for dumpstack must be in rsp: This ruins the nice link list.
+   480                                  dumpstack 21,0,120                                          ;View 120 quadwords of stack
+   481 0000007E 54                  <1>  push rsp
+   482 0000007F 55                  <1>  push rbp
+   483 00000080 6A78                <1>  push qword %3
+   484 00000082 6A00                <1>  push qword %2
+   485 00000084 6A15                <1>  push qword %1
+   486 00000086 E8(00000000)        <1>  call showstacksubprogram
+   487                              <1> 
+   488 0000008B 4C89CD                  mov       rbp, r9                                           ;The former value of rbp is restored
+   489                                  
+   490 0000008E 41BF00000000            mov       r15, 0 											;start loop counter
+   491                                  
+   492                                  start:
+   493 00000094 4981FFFF020000          cmp        r15, 767 										;end of loop counter
+   494 0000009B 7F24                    JG	   end
+   495                                  
+   496                                  
+   497 0000009D 90<rept>                	align 16                                                ;get ready to print in hex
+   498 000000A0 B800000000              	mov qword  rax, 0                                       ;no avx registers to print
+   499 000000A5 48BF-                   	mov        rdi, hex_msg									;RBP: value
+   500 000000A7 [0000000000000000] 
+   501 000000AF 4A8B343C                	mov        rsi, [rsp+r15]								;get rbp from stack
+   502 000000B3 E8(00000000)            	call       printf										;print 
+   503                                  
+   504 000000B8 4981C700010000          	add        r15, 256                                     ;increment to get next rbp
+   505                                  
+   506 000000BF EBD3                    jmp        start                                            ;jump back to top of loop
+   507                                  end:                                                        ;end of loop
+   508                                  
+   509                                  
+   510 000000C1 48C7842488010000FF-     mov qword [rsp + 392], 16383 								;change value of 8 in program c1.cpp
+   511 000000CA 3F0000             
+   512                                  
+   513                                  dumpstack 21,0,120                                          ;View 120 quadwords of stack
+   514 000000CD 54                  <1>  push rsp
+   515 000000CE 55                  <1>  push rbp
+   516 000000CF 6A78                <1>  push qword %3
+   517 000000D1 6A00                <1>  push qword %2
+   518 000000D3 6A15                <1>  push qword %1
+   519 000000D5 E8(00000000)        <1>  call showstacksubprogram
+   520                              <1> 
+   521                                  
+   522                                  ;========== Restore registers and components        =======================================================
+   523                                  
+   524                                  restorecomponents
+   525                              <1> 
+   526                              <1> 
+   527                              <1> 
+   528                              <1> 
+   529                              <1> 
+   530                              <1> 
+   531                              <1> 
+   532 000000DA 5B                  <1> pop rbx
+   533 000000DB 4883FB00            <1> cmp rbx, 0
+   534 000000DF 7426                <1> je setreturnvalue
+   535                              <1> 
+   536                              <1> 
+   537                              <1> 
+   538                              <1> 
+   539                              <1> 
+   540                              <1> 
+   541 000000E1 B80D000000          <1> mov rax, 0x000000000000000d
+   542 000000E6 B900000000          <1> mov rcx, 0
+   543                              <1> 
+   544                              <1> 
+   545 000000EB 0FA2                <1> cpuid
+   546                              <1> 
+   547                              <1> 
+   548                              <1> 
+   549                              <1> 
+   550 000000ED 41BF07000000        <1> mov r15, 7
+   551 000000F3 4C21F8              <1> and rax, r15
+   552 000000F6 41BF00000000        <1> mov r15, 0
+   553 000000FC 4C21FA              <1> and rdx, r15
+   554                              <1> 
+   555 000000FF 0FAE2C25[00000000]  <1> xrstor [backuparea]
+   556                              <1> 
+   557                              <1> 
+   558                              <1> 
+   559                              <1> 
+   560                              <1> 
+   561                              <1> 
+   562                              <1> setreturnvalue:
+   563                              <1> 
+   564 00000107 4156                <1> push r14
+   565 00000109 F20F100424          <1> movsd xmm0, [rsp]
+   566 0000010E 415E                <1> pop r14
+   567                              <1> 
+   568                                  restoreGPR     
+   569                              <1> 
+   570                              <1> 
+   571                              <1> 
+   572 00000110 9D                  <1> popf
+   573 00000111 415F                <1> pop r15
+   574 00000113 415E                <1> pop r14
+   575 00000115 415D                <1> pop r13
+   576 00000117 415C                <1> pop r12
+   577 00000119 415B                <1> pop r11
+   578 0000011B 415A                <1> pop r10
+   579 0000011D 4159                <1> pop r9
+   580 0000011F 4158                <1> pop r8
+   581 00000121 5F                  <1> pop rdi
+   582 00000122 5E                  <1> pop rsi
+   583 00000123 5A                  <1> pop rdx
+   584 00000124 59                  <1> pop rcx
+   585 00000125 5B                  <1> pop rbx
+   586 00000126 5D                  <1> pop rbp
+   587                              <1> 
+   588 00000127 C3                  <1> ret
+   589                              <1> 
+   590                                  
+   591                                  ;========== End of program harmonic.asm =======================================================================================
+   592                                  
